@@ -18,6 +18,7 @@ interface GardenConfig {
   pillarDensity: number;
   plantChanceNearPath: number;
   seed: number;
+  coverageRadius: number;
 }
 
 const tileColor = (tile: Garden.Tile): string => {
@@ -42,9 +43,16 @@ export const GardenView: React.FC<GardenViewProps> = ({
     pillarDensity: 0.04,
     plantChanceNearPath: 0.25,
     seed: 42, // static default
+    coverageRadius: 1,
   });
 
   const [garden, setGarden] = useState<Garden | null>(null);
+
+  // NEW: which hose tile is hovered
+  const [hoveredHoseCenter, setHoveredHoseCenter] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
   const regenerate = () => {
     const base = generateGarden({
@@ -54,7 +62,9 @@ export const GardenView: React.FC<GardenViewProps> = ({
       plantChanceNearPath: config.plantChanceNearPath,
       seed: config.seed,
     });
-    const withHoses = planHoses(base);
+    const withHoses = planHoses(base, {
+      coverageRadius: config.coverageRadius,
+    });
     setGarden(withHoses);
   };
 
@@ -69,7 +79,9 @@ export const GardenView: React.FC<GardenViewProps> = ({
         plantChanceNearPath: next.plantChanceNearPath,
         seed: next.seed,
       });
-      const withHoses = planHoses(base);
+      const withHoses = planHoses(base, {
+        coverageRadius: next.coverageRadius,
+      });
       setGarden(withHoses);
       return next;
     });
@@ -213,6 +225,28 @@ export const GardenView: React.FC<GardenViewProps> = ({
               }}
             />
           </div>
+
+          {/* Hose coverage radius */}
+          <div className="flex items-center gap-1">
+            <span>CoverR</span>
+            <Input
+              type="number"
+              className="w-16 h-8"
+              min={0}
+              max={5}
+              step={1}
+              value={config.coverageRadius}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                if (Number.isNaN(value)) return;
+                const clamped = Math.min(5, Math.max(0, value));
+                setConfig((prev) => ({
+                  ...prev,
+                  coverageRadius: clamped,
+                }));
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -232,6 +266,12 @@ export const GardenView: React.FC<GardenViewProps> = ({
           const key = `${tile.x}-${tile.y}`;
           const hasHose = hoseTiles.has(key);
 
+          const isInWateringRange =
+            hoveredHoseCenter !== null &&
+            Math.abs(hoveredHoseCenter.x - tile.x) +
+              Math.abs(hoveredHoseCenter.y - tile.y) <=
+              config.coverageRadius;
+
           return (
             <div
               key={key}
@@ -241,7 +281,30 @@ export const GardenView: React.FC<GardenViewProps> = ({
                 backgroundColor: tileColor(tile),
                 position: "relative",
               }}
+              onMouseEnter={() => {
+                if (hasHose) {
+                  setHoveredHoseCenter({ x: tile.x, y: tile.y });
+                }
+              }}
+              onMouseLeave={() => {
+                if (hasHose) {
+                  setHoveredHoseCenter(null);
+                }
+              }}
             >
+              {/* Watering overlay when hovering a hose */}
+              {isInWateringRange && (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 1,
+                    borderRadius: 3,
+                    backgroundColor: "rgba(56, 189, 248, 0.35)", // light blue
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
+
               {tile.hasPlant && (
                 <div
                   style={{
