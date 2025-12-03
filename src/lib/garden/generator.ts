@@ -304,5 +304,6 @@ export function generateGarden(
     width,
     height,
     tiles,
+    hoses: [],
   };
 }

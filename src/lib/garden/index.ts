@@ -1,3 +1,6 @@
 export * from './GardenView'
 export * from './generator'
 export * from './types'
+export * from './grid'
+export * from './hosePlanner'
+export * from './pathfinding'

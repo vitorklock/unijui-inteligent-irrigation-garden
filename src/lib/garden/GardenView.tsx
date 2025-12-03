@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { generateGarden } from "@/lib/garden/generator";
+import { planHoses } from "@/lib/garden/hosePlanner";
 import { Garden } from "./types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,31 +47,45 @@ export const GardenView: React.FC<GardenViewProps> = ({
   const [garden, setGarden] = useState<Garden | null>(null);
 
   const regenerate = () => {
-    const g = generateGarden({
+    const base = generateGarden({
       width: config.width,
       height: config.height,
       pillarDensity: config.pillarDensity,
       plantChanceNearPath: config.plantChanceNearPath,
-      seed: config.seed, // <– use current seed, do NOT change it
+      seed: config.seed,
     });
-    setGarden(g);
+    const withHoses = planHoses(base);
+    setGarden(withHoses);
   };
 
   const randomizeSeed = () => {
     setConfig((prev) => {
       const newSeed = Math.floor(Math.random() * 10_000);
       const next = { ...prev, seed: newSeed };
-      const g = generateGarden({
+      const base = generateGarden({
         width: next.width,
         height: next.height,
         pillarDensity: next.pillarDensity,
         plantChanceNearPath: next.plantChanceNearPath,
         seed: next.seed,
       });
-      setGarden(g);
+      const withHoses = planHoses(base);
+      setGarden(withHoses);
       return next;
     });
   };
+
+  // Precompute hose tiles for fast lookups
+  const hoseTiles = useMemo(() => {
+    const set = new Set<string>();
+    if (!garden?.hoses) return set;
+    for (const hose of garden.hoses) {
+      for (const p of hose.tiles) {
+        set.add(`${p.x}-${p.y}`);
+      }
+    }
+    return set;
+  }, [garden]);
 
   // initial generation
   useEffect(() => {
@@ -213,31 +228,48 @@ export const GardenView: React.FC<GardenViewProps> = ({
           borderRadius: 4,
         }}
       >
-        {garden.tiles.flat().map((tile) => (
-          <div
-            key={`${tile.x}-${tile.y}`}
-            style={{
-              width: 18,
-              height: 18,
-              backgroundColor: tileColor(tile),
-              position: "relative",
-            }}
-          >
-            {tile.hasPlant && (
-              <div
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  backgroundColor: "#16a34a",
-                  margin: "auto",
-                  position: "absolute",
-                  inset: 0,
-                }}
-              />
-            )}
-          </div>
-        ))}
+        {garden.tiles.flat().map((tile) => {
+          const key = `${tile.x}-${tile.y}`;
+          const hasHose = hoseTiles.has(key);
+
+          return (
+            <div
+              key={key}
+              style={{
+                width: 18,
+                height: 18,
+                backgroundColor: tileColor(tile),
+                position: "relative",
+              }}
+            >
+              {tile.hasPlant && (
+                <div
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    backgroundColor: "#16a34a",
+                    margin: "auto",
+                    position: "absolute",
+                    inset: 0,
+                  }}
+                />
+              )}
+
+              {hasHose && (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 1,
+                    borderRadius: 9999,
+                    border: "1px solid #0ea5e9",
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
