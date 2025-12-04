@@ -86,6 +86,9 @@ export const GardenView: React.FC<GardenViewProps> = ({
 
   });
 
+  // Track if user has explicitly overridden the episode end pause
+  const [overrideEpisodeEnd, setOverrideEpisodeEnd] = useState(false);
+
   const regenerate = () => {
     const base = generateGarden({
       width: config.width,
@@ -100,6 +103,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
     setGarden(withHoses);
     // Reset simulation progress when regenerating the garden
     setSimulation((s) => ({ ...s, tick: 0, isRunning: false }));
+    setOverrideEpisodeEnd(false);
   };
 
   const randomizeSeed = () => {
@@ -122,6 +126,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
         seed: newSeed,
       });
       setSimulation((s) => ({ ...s, tick: 0, isRunning: false }));
+      setOverrideEpisodeEnd(false);
       return next;
     });
   };
@@ -150,6 +155,11 @@ export const GardenView: React.FC<GardenViewProps> = ({
 
     const interval = setInterval(() => {
       setSimulation((prev) => {
+        // Check if we've reached the episode length (auto-pause unless overridden)
+        if (prev.tick >= prev.episodeLength && !overrideEpisodeEnd) {
+          return { ...prev, isRunning: false };
+        }
+
         // simple animated weather, for now
         const nextWeather = evolveWeather(config.seed, prev.weather, prev.tick);
 
@@ -186,7 +196,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
     }, 100); // 100ms per tick
 
     return () => clearInterval(interval);
-  }, [garden, simulation.isRunning]);
+  }, [garden, simulation.isRunning, overrideEpisodeEnd]);
 
 
   if (!garden) return <div>Generating garden…</div>;
@@ -430,9 +440,18 @@ export const GardenView: React.FC<GardenViewProps> = ({
             {/* Right Panel: Controls and Stats */}
             <div className="flex flex-col gap-4">
               <button
-                onClick={() =>
-                  setSimulation((prev) => ({ ...prev, isRunning: !prev.isRunning }))
-                }
+                onClick={() => {
+                  const isCurrentlyRunning = simulation.isRunning;
+                  // If pressing play and we're at episode end, enable override
+                  if (!isCurrentlyRunning && simulation.tick >= simulation.episodeLength) {
+                    setOverrideEpisodeEnd(true);
+                  }
+                  // If pausing, clear the override
+                  if (isCurrentlyRunning) {
+                    setOverrideEpisodeEnd(false);
+                  }
+                  setSimulation((prev) => ({ ...prev, isRunning: !prev.isRunning }));
+                }}
                 className="px-3 py-2 border rounded"
               >
                 {simulation.isRunning ? "Pause" : "Play"}
