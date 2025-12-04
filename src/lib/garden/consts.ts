@@ -15,3 +15,4 @@ export const TILE_MOISTURE_GOOD=0.7
 export const TILE_MOISTURE_FLOODED=1.3
 
 export const GARDEN_PATH_BRANCH_COUNT=6
+

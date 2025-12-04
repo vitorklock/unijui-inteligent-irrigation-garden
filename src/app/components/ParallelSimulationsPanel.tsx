@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Spinner } from "@/components/ui/spinner";
 import { runParallelGardenSimulations } from "@/app/actions/garden";
 import type { Simulation } from "@/lib/garden/types";
+import { CONTROLLERS } from "@/lib/garden/controllers/map";
 
 interface ParallelSimulationConfig {
   width: number;
@@ -16,6 +17,7 @@ interface ParallelSimulationConfig {
   coverageRadius: number;
   simulationCount: number;
   baseSeed: number;
+  controllerKey: keyof typeof CONTROLLERS;
 }
 
 export const ParallelSimulationsPanel: React.FC = () => {
@@ -27,6 +29,7 @@ export const ParallelSimulationsPanel: React.FC = () => {
     coverageRadius: 1,
     simulationCount: 5,
     baseSeed: 42,
+    controllerKey: Object.keys(CONTROLLERS)[0] as keyof typeof CONTROLLERS,
   });
 
   const [results, setResults] = useState<Simulation.Results[] | null>(null);
@@ -47,6 +50,7 @@ export const ParallelSimulationsPanel: React.FC = () => {
         coverageRadius: config.coverageRadius,
         count: config.simulationCount,
         baseSeed: config.baseSeed,
+        controllerKey: config.controllerKey,
       });
 
       setResults(simulationResults);
@@ -61,7 +65,14 @@ export const ParallelSimulationsPanel: React.FC = () => {
   const updateConfig = (key: keyof ParallelSimulationConfig, value: string | number) => {
     setConfig((prev) => ({
       ...prev,
-      [key]: typeof value === "string" ? (key === "simulationCount" ? parseInt(value, 10) : parseFloat(value)) : value,
+      // controllerKey should be set as a string directly; simulationCount as int; other numeric fields parsed as float
+      [key]: typeof value === "string"
+        ? key === "simulationCount"
+          ? parseInt(value, 10)
+          : key === "controllerKey"
+            ? (value as any)
+            : parseFloat(value)
+        : value,
     }));
   };
 
@@ -146,6 +157,22 @@ export const ParallelSimulationsPanel: React.FC = () => {
                 onChange={(e) => updateConfig("baseSeed", e.target.value)}
                 disabled={loading}
               />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Controller</label>
+              <select
+                className="rounded-md border p-2 text-xs"
+                value={config.controllerKey as string}
+                onChange={(e) => updateConfig("controllerKey", e.target.value)}
+                disabled={loading}
+              >
+                {Object
+                  .keys(CONTROLLERS)
+                  .filter(k => k !== 'manual')
+                  .map((k) => (
+                    <option key={k} value={k}>{k}</option>
+                  ))}
+              </select>
             </div>
           </div>
           <div className="flex gap-2 mt-4">
@@ -237,11 +264,10 @@ export const ParallelSimulationsPanel: React.FC = () => {
                   {results.map((result, index) => (
                     <tr key={index} className="border-b hover:bg-gray-50">
                       <td className="px-4 py-2 font-medium">#{index + 1}</td>
-                      <td className={`px-4 py-2 text-right font-bold ${
-                        result.finalScore >= 70 ? "text-green-600" : 
-                        result.finalScore >= 50 ? "text-yellow-600" : 
-                        "text-red-600"
-                      }`}>
+                      <td className={`px-4 py-2 text-right font-bold ${result.finalScore >= 70 ? "text-green-600" :
+                        result.finalScore >= 50 ? "text-yellow-600" :
+                          "text-red-600"
+                        }`}>
                         {result.finalScore}
                       </td>
                       <td className="px-4 py-2 text-right">{result.totalWaterUsed.toFixed(2)}</td>

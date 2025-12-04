@@ -3,6 +3,7 @@
 import chalk from "chalk";
 import { GardenSimulation, GardenSimulationOptions } from "@/lib/garden/GardenSimulation";
 import { Simulation } from "@/lib/garden/types";
+import { ControllerKey, CONTROLLERS } from "@/lib/garden/controllers/map";
 
 /**
  * Options for running parallel simulations
@@ -12,6 +13,8 @@ export interface RunParallelSimulationsOptions extends Omit<GardenSimulationOpti
   count: number;
   /** Random seed for generating the random seeds for each simulation */
   baseSeed?: number;
+  /** Optional controller key to use for all simulations (must be a key in `CONTROLLERS`) */
+  controllerKey?: ControllerKey;
 }
 
 /**
@@ -23,13 +26,17 @@ export async function runParallelGardenSimulations(
   options: RunParallelSimulationsOptions
 ): Promise<Simulation.Results[]> {
   const { count, baseSeed = Date.now(), ...sharedConfig } = options;
+  const controllerKey = (options as RunParallelSimulationsOptions).controllerKey;
+  const ControllerClass = controllerKey ? CONTROLLERS[controllerKey] : undefined;
 
   console.log(chalk.blue.bold(`\n🌱 Starting ${count} parallel garden simulations...`));
 
   // Create simulation promises with different seeds
   const simulationPromises = Array.from({ length: count }, (_, index) => {
     const seed = baseSeed + index;
-    return runSingleSimulation({ ...sharedConfig, seed }, index);
+    // If a controller class/key was provided, instantiate it and pass it to the simulation
+    const controllerInstance = ControllerClass ? new ControllerClass() : undefined;
+    return runSingleSimulation({ ...sharedConfig, seed, controller: controllerInstance }, index);
   });
 
   // Run all simulations in parallel
