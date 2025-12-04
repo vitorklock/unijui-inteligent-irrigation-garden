@@ -51,6 +51,10 @@ export namespace Weather {
     }
 }
 
+export interface IrrigationController {
+    decide(metrics: Simulation.Metrics, state: Simulation.State): boolean;
+}
+
 export namespace Simulation {
 
     /** Static parameters for the moisture simulation */

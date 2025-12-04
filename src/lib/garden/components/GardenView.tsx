@@ -10,6 +10,7 @@ import { EpisodeResults } from "./EpisodeResults";
 import { RainForecastTable } from "./RainForecastTable";
 import { MoistureStatusMap } from "./MoistureStatusMap";
 import { GardenSimulation, GardenSimulationOptions } from "../GardenSimulation";
+import { ManualIrrigationController } from "../controllers/ManualIrrigationController";
 
 interface GardenViewProps {
   width?: number;
@@ -53,6 +54,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
 
   // Simulation instance (ref to persist across renders)
   const simRef = useRef<GardenSimulation | null>(null);
+  const controllerRef = useRef<ManualIrrigationController>(new ManualIrrigationController());
   const [garden, setGarden] = useState<Garden | null>(null);
   const [simulation, setSimulation] = useState<Simulation.State | null>(null);
   const [hoveredHoseCenter, setHoveredHoseCenter] = useState<{ x: number; y: number } | null>(null);
@@ -67,6 +69,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
       plantChanceNearPath: config.plantChanceNearPath,
       seed: config.seed,
       coverageRadius: config.coverageRadius,
+      controller: controllerRef.current,
     };
     simRef.current = new GardenSimulation(options);
     setGarden(simRef.current.garden);
@@ -86,6 +89,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
         plantChanceNearPath: next.plantChanceNearPath,
         seed: next.seed,
         coverageRadius: next.coverageRadius,
+        controller: controllerRef.current,
       };
       simRef.current = new GardenSimulation(options);
       setGarden(simRef.current.garden);
@@ -394,14 +398,15 @@ export const GardenView: React.FC<GardenViewProps> = ({
 
               <button
                 onClick={() => {
+                  const newState = !controllerRef.current.isIrrigationEnabled();
+                  controllerRef.current.setIrrigation(newState);
                   if (simRef.current) {
-                    simRef.current.state.irrigationOn = !simRef.current.state.irrigationOn;
                     setSimulation({ ...simRef.current.state });
                   }
                 }}
                 className="px-3 py-2 border rounded"
               >
-                Irrigation: {simulation.irrigationOn ? "On" : "Off"}
+                Irrigation: {controllerRef.current.isIrrigationEnabled() ? "On" : "Off"}
               </button>
 
               <div className="flex flex-col gap-2 text-xs text-gray-500 border rounded p-2">

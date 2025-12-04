@@ -1,8 +1,9 @@
-import { Garden, Simulation, Weather } from "./types";
+import { Garden, Simulation, Weather, IrrigationController } from "./types";
 import { generateGarden } from "./generator";
 import { planHoses } from "./hosePlanner";
 import { stepGardenMoisture, evolveWeather } from "./simulation";
 import { EPISODE_LENGTH, FORECAST_TICK_WINDOW, IDEAL_MIN_MOISTURE, IDEAL_MAX_MOISTURE, WATER_USAGE_PER_TICK } from "./consts";
+import { computeGardenMetrics } from "./metrics";
 
 function createDefaultState(options: GardenSimulationOptions): Simulation.State {
     return {
@@ -46,12 +47,23 @@ export interface GardenSimulationOptions {
     seed: number;
     coverageRadius: number;
     simConfig?: Partial<Simulation.Config>;
+    controller?: IrrigationController;
+}
+
+/**
+ * Default controller that always keeps irrigation on
+ */
+class DefaultIrrigationController implements IrrigationController {
+    decide(): boolean {
+        return true;
+    }
 }
 
 export class GardenSimulation {
     public garden: Garden;
     public state: Simulation.State;
     public overrideEpisodeEnd: boolean = false;
+    private controller: IrrigationController;
 
     constructor(options: GardenSimulationOptions) {
         this.garden = planHoses(
@@ -65,6 +77,8 @@ export class GardenSimulation {
             { coverageRadius: options.coverageRadius }
         );
         this.state = createDefaultState(options);
+        // Set default controller or use provided one
+        this.controller = options.controller || new DefaultIrrigationController();
     }
 
     private countPlants(): number {
@@ -227,6 +241,11 @@ export class GardenSimulation {
             this.state.isRunning = false;
             return;
         }
+        
+        // Let the controller decide on irrigation state
+        const metrics = computeGardenMetrics(this.state, this.garden);
+        this.state.irrigationOn = this.controller.decide(metrics, this.state);
+        
         // Weather evolution
         const nextWeather = evolveWeather(
             this.garden.seed ?? 42,
