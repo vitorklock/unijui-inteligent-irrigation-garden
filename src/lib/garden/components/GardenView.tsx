@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { generateGarden } from "@/lib/garden/generator";
 import { planHoses } from "@/lib/garden/hosePlanner";
-import { Garden, Simulation } from "./types";
+import { Garden, Simulation } from "../types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { evolveWeather, stepGardenMoisture } from "./simulation";
+import { evolveWeather, stepGardenMoisture } from "../simulation";
 
 interface GardenViewProps {
   width?: number;
@@ -73,6 +73,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
       rainToMoisture: 0.03,
       maxMoisture: 2.0,
     },
+    
   });
 
   const regenerate = () => {

@@ -40,13 +40,13 @@ export namespace Weather {
 
     export interface State {
         /** °C, e.g. 0–40 */
-        temperature: number;
+        temperature: number
         /** 0–1, relative humidity */
-        humidity: number;
+        humidity: number
         /** 0–1, 0 = night, 1 = full sun */
-        sunIntensity: number;
+        sunIntensity: number
         /** 0–1, 0 = no rain, 1 = heavy rain */
-        rainIntensity: number;
+        rainIntensity: number
     }
 }
 
@@ -55,22 +55,42 @@ export namespace Simulation {
     /** Static parameters for the moisture simulation */
     export interface Config {
         /** Moisture added per tick at hose tiles when irrigation is ON */
-        irrigationRate: number;
+        irrigationRate: number
         /** Base evaporation rate per tick at neutral weather */
-        baseEvaporationRate: number;
+        baseEvaporationRate: number
         /** How strongly moisture diffuses between neighbors (0–0.5) */
-        diffusionRate: number;
+        diffusionRate: number
         /** Multiplier for rain → soil moisture */
-        rainToMoisture: number;
+        rainToMoisture: number
         /** Maximum moisture before we clamp (visual flooding can still be 1.2+ etc.) */
-        maxMoisture: number;
+        maxMoisture: number
     }
 
     export interface State {
-        tick: number;
-        isRunning: boolean;
-        irrigationOn: boolean;
-        weather: Weather.State;
-        config: Simulation.Config;
+        tick: number
+        isRunning: boolean
+        irrigationOn: boolean
+        weather: Weather.State
+        config: Simulation.Config
+        episodeLength: number
+        forecast: number[]
+        waterUsedThisTick: number
+        lastIrrigationTick: number
+        cumulativeWaterUsed: number
     }
+
+    export interface Metrics {
+        avgMoisture: number
+        minMoisture: number
+        maxMoisture: number
+        percentTooDry: number   // % of plants with moisture < IDEAL_MIN_MOISTURE
+        percentTooWet: number   // % of plants with moisture > IDEAL_MAX_MOISTURE
+        irrigationOn: boolean
+        ticksSinceLastIrrigation: number
+        timeOfDay: number       // normalized time of day [0–1]
+        episodeProgress: number // progress of the episode [0–1]
+        waterUsedThisTick: number
+        cumulativeWaterUsed: number
+    }
+
 }

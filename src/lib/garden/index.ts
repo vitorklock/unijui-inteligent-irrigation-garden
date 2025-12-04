@@ -1,4 +1,4 @@
-export * from './GardenView'
+export * from './components/GardenView'
 export * from './generator'
 export * from './types'
 export * from './grid'
