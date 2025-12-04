@@ -34,7 +34,7 @@ export function MoistureStatusMap({ tiles }: MoistureStatusMapProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Moisture Status</CardTitle>
+        <CardTitle>Moisture Status 🚰</CardTitle>
       </CardHeader>
       <CardContent>
         {/* Miniature map of plant moisture status */}

@@ -20,7 +20,7 @@ export function RainForecastTable({ forecast, currentTick }: RainForecastTablePr
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Rain Forecast</CardTitle>
+        <CardTitle>Rain Forecast 🌦️</CardTitle>
       </CardHeader>
       <CardContent className="p-3">
         <div

@@ -80,6 +80,14 @@ export namespace Simulation {
         waterUsedThisTick: number
         lastIrrigationTick: number
         cumulativeWaterUsed: number
+        // Accumulators for episode results
+        dryPlantTicks?: number
+        floodedPlantTicks?: number
+        healthyPlantTicks?: number
+        peakSimultaneousFloodedPlants?: number
+        peakSimultaneousDryPlants?: number
+        // Results are produced once an episode finishes
+        results?: Results
     }
 
     export interface Metrics {
@@ -94,6 +102,18 @@ export namespace Simulation {
         episodeProgress: number // progress of the episode [0–1]
         waterUsedThisTick: number
         cumulativeWaterUsed: number
+    }
+
+    export interface Results {
+        totalWaterUsed: number
+        dryPlantTicks: number
+        floodedPlantTicks: number
+        healthyPlantTicks: number
+        peakSimultaneousFloodedPlants: number
+        peakSimultaneousDryPlants: number
+        tickCount: number
+        finalScore: number
+        totalPlantTicks: number
     }
 
 }

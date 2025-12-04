@@ -15,7 +15,7 @@ export function MetricsPanel({ state, garden }: MetricsPanelProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Current Metrics</CardTitle>
+        <CardTitle>Current Metrics 📏</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
         {/* Moisture statistics */}

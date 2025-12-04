@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { TILE_MOISTURE_DRY, TILE_MOISTURE_FLOODED, TILE_MOISTURE_GOOD } from "@/lib/garden/consts";
 import type { Garden, Simulation } from "../types";
 import { MetricsPanel } from "./MetricsPanel";
+import { EpisodeResults } from "./EpisodeResults";
 import { RainForecastTable } from "./RainForecastTable";
 import { MoistureStatusMap } from "./MoistureStatusMap";
 import { GardenSimulation, GardenSimulationOptions } from "../GardenSimulation";
@@ -378,6 +379,11 @@ export const GardenView: React.FC<GardenViewProps> = ({
                   }
                   if (simRef.current) {
                     simRef.current.state.isRunning = !simRef.current.state.isRunning;
+                    // If we just paused the simulation, compile results immediately
+                    if (isCurrentlyRunning) {
+                      // compileResults updates simRef.current.state.results
+                      simRef.current.compileResults();
+                    }
                     setSimulation({ ...simRef.current.state });
                   }
                 }}
@@ -410,7 +416,10 @@ export const GardenView: React.FC<GardenViewProps> = ({
 
         {/* Sidebar */}
         <aside className="w-full flex *:grow gap-4 p-4 bg-gray-50">
-          <MetricsPanel state={simulation} garden={garden} />
+          <div className="flex flex-col gap-4">
+            <EpisodeResults results={simulation.results} />
+            <MetricsPanel state={simulation} garden={garden} />
+          </div>
           <div className="flex flex-col gap-4">
             <RainForecastTable forecast={simulation.forecast} currentTick={simulation.tick} />
             <MoistureStatusMap tiles={garden.tiles} />

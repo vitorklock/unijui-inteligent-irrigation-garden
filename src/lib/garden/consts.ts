@@ -6,7 +6,7 @@ export const IDEAL_MAX_MOISTURE = 1
 /** Assumed values for simulation */
 export const TICKS_PER_DAY = 100
 export const WATER_USAGE_PER_TICK = 1  
-export const EPISODE_LENGTH=1000
+export const EPISODE_LENGTH=50
 
 export const FORECAST_TICK_WINDOW = 10
 
