@@ -397,5 +397,6 @@ export function generateGarden(
         height,
         tiles,
         hoses: [],
+        seed: opts.seed,
     };
 }

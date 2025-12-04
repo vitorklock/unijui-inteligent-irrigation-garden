@@ -1,16 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { generateGarden } from "@/lib/garden/generator";
-import { planHoses } from "@/lib/garden/hosePlanner";
-import { Garden, Simulation } from "../types";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { evolveWeather, stepGardenMoisture } from "../simulation";
-import { EPISODE_LENGTH, FORECAST_TICK_WINDOW, TILE_MOISTURE_DRY, TILE_MOISTURE_FLOODED, TILE_MOISTURE_GOOD } from "@/lib/garden/consts";
+import { TILE_MOISTURE_DRY, TILE_MOISTURE_FLOODED, TILE_MOISTURE_GOOD } from "@/lib/garden/consts";
+import type { Garden, Simulation } from "../types";
 import { MetricsPanel } from "./MetricsPanel";
 import { RainForecastTable } from "./RainForecastTable";
 import { MoistureStatusMap } from "./MoistureStatusMap";
+import { GardenSimulation, GardenSimulationOptions } from "../GardenSimulation";
 
 interface GardenViewProps {
   width?: number;
@@ -51,81 +49,46 @@ export const GardenView: React.FC<GardenViewProps> = ({
     coverageRadius: 1,
   });
 
+
+  // Simulation instance (ref to persist across renders)
+  const simRef = useRef<GardenSimulation | null>(null);
   const [garden, setGarden] = useState<Garden | null>(null);
-
-  // NEW: which hose tile is hovered
-  const [hoveredHoseCenter, setHoveredHoseCenter] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-
-  // Simulation state (tick, running, weather, and sim config)
-  const [simulation, setSimulation] = useState<Simulation.State>({
-    tick: 0,
-    isRunning: false,
-    irrigationOn: true,
-    weather: {
-      temperature: 25,
-      humidity: 0.5,
-      sunIntensity: 0.8,
-      rainIntensity: 0,
-    },
-    config: {
-      irrigationRate: 0.05,
-      baseEvaporationRate: 0.01,
-      diffusionRate: 0.15,
-      rainToMoisture: 0.1,
-      maxMoisture: 2.0,
-      coverageRadius: config.coverageRadius,
-    },
-    episodeLength: EPISODE_LENGTH,
-    forecast: Array.from({ length: 10 }, () => 0),
-    waterUsedThisTick: 0,
-    lastIrrigationTick: 0,
-    cumulativeWaterUsed: 0,
-
-  });
-
-  // Track if user has explicitly overridden the episode end pause
+  const [simulation, setSimulation] = useState<Simulation.State | null>(null);
+  const [hoveredHoseCenter, setHoveredHoseCenter] = useState<{ x: number; y: number } | null>(null);
   const [overrideEpisodeEnd, setOverrideEpisodeEnd] = useState(false);
 
+
   const regenerate = () => {
-    const base = generateGarden({
+    const options: GardenSimulationOptions = {
       width: config.width,
       height: config.height,
       pillarDensity: config.pillarDensity,
       plantChanceNearPath: config.plantChanceNearPath,
       seed: config.seed,
-    });
-    const withHoses = planHoses(base, {
       coverageRadius: config.coverageRadius,
-    });
-    setGarden(withHoses);
-    // Reset simulation progress when regenerating the garden
-    setSimulation((s) => ({ ...s, tick: 0, isRunning: false }));
+    };
+    simRef.current = new GardenSimulation(options);
+    setGarden(simRef.current.garden);
+    setSimulation({ ...simRef.current.state });
     setOverrideEpisodeEnd(false);
   };
 
+
   const randomizeSeed = () => {
+    const newSeed = Math.floor(Math.random() * 10_000);
     setConfig((prev) => {
-      const newSeed = Math.floor(Math.random() * 10_000);
       const next = { ...prev, seed: newSeed };
-      const base = generateGarden({
+      const options: GardenSimulationOptions = {
         width: next.width,
         height: next.height,
         pillarDensity: next.pillarDensity,
         plantChanceNearPath: next.plantChanceNearPath,
         seed: next.seed,
-      });
-      const withHoses = planHoses(base, {
         coverageRadius: next.coverageRadius,
-      });
-      setGarden(withHoses);
-      setConfig({
-        ...config,
-        seed: newSeed,
-      });
-      setSimulation((s) => ({ ...s, tick: 0, isRunning: false }));
+      };
+      simRef.current = new GardenSimulation(options);
+      setGarden(simRef.current.garden);
+      setSimulation({ ...simRef.current.state });
       setOverrideEpisodeEnd(false);
       return next;
     });
@@ -144,62 +107,27 @@ export const GardenView: React.FC<GardenViewProps> = ({
   }, [garden]);
 
   // initial generation
+
   useEffect(() => {
     regenerate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+
   useEffect(() => {
-    if (!garden) return;
-    if (!simulation.isRunning) return;
-
+    if (!simRef.current || !simulation?.isRunning) return;
     const interval = setInterval(() => {
-      setSimulation((prev) => {
-        // Check if we've reached the episode length (auto-pause unless overridden)
-        if (prev.tick >= prev.episodeLength && !overrideEpisodeEnd) {
-          return { ...prev, isRunning: false };
-        }
-
-        // simple animated weather, for now
-        const nextWeather = evolveWeather(config.seed, prev.weather, prev.tick);
-
-        setGarden((currentGarden) => {
-          if (!currentGarden) return currentGarden;
-
-          const nextGarden = stepGardenMoisture({
-            garden: currentGarden,
-            config: { ...prev.config, coverageRadius: config.coverageRadius },
-            weather: nextWeather,
-            irrigationOn: prev.irrigationOn,
-          });
-
-          return nextGarden;
-        });
-
-        // Build a short forecast of upcoming rain intensities.
-        // We iteratively apply `evolveWeather` starting from the current
-        // `prev.weather` so the forecast respects the decay/randomness logic.
-        let tempWeather = prev.weather;
-        const forecast = Array.from({ length: FORECAST_TICK_WINDOW }, (_, k) => {
-          const w = evolveWeather(config.seed, tempWeather, prev.tick + k);
-          tempWeather = w;
-          return w.rainIntensity;
-        });
-
-        return {
-          ...prev,
-          tick: prev.tick + 1,
-          weather: nextWeather,
-          forecast,
-        };
-      });
-    }, 100); // 100ms per tick
-
+      if (!simRef.current) return;
+      simRef.current.overrideEpisodeEnd = overrideEpisodeEnd;
+      simRef.current.step();
+      setGarden(simRef.current.garden);
+      setSimulation({ ...simRef.current.state });
+    }, 100);
     return () => clearInterval(interval);
-  }, [garden, simulation.isRunning, overrideEpisodeEnd]);
+  }, [simulation?.isRunning, overrideEpisodeEnd]);
 
 
-  if (!garden) return <div>Generating garden…</div>;
+  if (!garden || !simulation) return <div>Generating garden…</div>;
 
   return (
     <div className="flex flex-col gap-3">
@@ -362,7 +290,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
                 borderRadius: 4,
               }}
             >
-              {garden.tiles.flat().map((tile) => {
+              {(garden.tiles.flat() as Garden.Tile[]).map((tile) => {
                 const key = `${tile.x}-${tile.y}`;
                 const hasHose = hoseTiles.has(key);
 
@@ -442,15 +370,16 @@ export const GardenView: React.FC<GardenViewProps> = ({
               <button
                 onClick={() => {
                   const isCurrentlyRunning = simulation.isRunning;
-                  // If pressing play and we're at episode end, enable override
                   if (!isCurrentlyRunning && simulation.tick >= simulation.episodeLength) {
                     setOverrideEpisodeEnd(true);
                   }
-                  // If pausing, clear the override
                   if (isCurrentlyRunning) {
                     setOverrideEpisodeEnd(false);
                   }
-                  setSimulation((prev) => ({ ...prev, isRunning: !prev.isRunning }));
+                  if (simRef.current) {
+                    simRef.current.state.isRunning = !simRef.current.state.isRunning;
+                    setSimulation({ ...simRef.current.state });
+                  }
                 }}
                 className="px-3 py-2 border rounded"
               >
@@ -458,12 +387,12 @@ export const GardenView: React.FC<GardenViewProps> = ({
               </button>
 
               <button
-                onClick={() =>
-                  setSimulation((prev) => ({
-                    ...prev,
-                    irrigationOn: !prev.irrigationOn,
-                  }))
-                }
+                onClick={() => {
+                  if (simRef.current) {
+                    simRef.current.state.irrigationOn = !simRef.current.state.irrigationOn;
+                    setSimulation({ ...simRef.current.state });
+                  }
+                }}
                 className="px-3 py-2 border rounded"
               >
                 Irrigation: {simulation.irrigationOn ? "On" : "Off"}

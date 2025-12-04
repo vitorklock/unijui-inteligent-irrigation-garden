@@ -34,6 +34,7 @@ export interface Garden {
     height: number
     tiles: Garden.Tile[][] // tiles[y][x]
     hoses: Garden.HosePath[]
+    seed?: number // Optional: seed used for deterministic generation
 }
 
 export namespace Weather {
