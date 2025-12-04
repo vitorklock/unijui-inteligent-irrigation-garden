@@ -84,6 +84,8 @@ export namespace Simulation {
         waterUsedThisTick: number
         lastIrrigationTick: number
         cumulativeWaterUsed: number
+        irrigationToggleCount: number // times irrigation changed state
+        irrigationOnTicks: number     // ticks irrigation was on
         // Accumulators for episode results
         dryPlantTicks?: number
         floodedPlantTicks?: number
@@ -118,6 +120,8 @@ export namespace Simulation {
         tickCount: number
         finalScore: number
         totalPlantTicks: number
+        irrigationToggleCount: number
+        irrigationOnTicks: number
     }
 
 }

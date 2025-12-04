@@ -30,6 +30,8 @@ function createDefaultState(options: GardenSimulationOptions): Simulation.State 
         waterUsedThisTick: 0,
         lastIrrigationTick: 0,
         cumulativeWaterUsed: 0,
+        irrigationToggleCount: 0,
+        irrigationOnTicks: 0,
         dryPlantTicks: 0,
         floodedPlantTicks: 0,
         healthyPlantTicks: 0,
@@ -55,7 +57,7 @@ export interface GardenSimulationOptions {
  */
 class DefaultIrrigationController implements IrrigationController {
     decide(): boolean {
-        return true;
+        return false;
     }
 }
 
@@ -212,6 +214,8 @@ export class GardenSimulation {
             tickCount,
             finalScore,
             totalPlantTicks, // ✅ fill the new field
+            irrigationToggleCount: this.state.irrigationToggleCount,
+            irrigationOnTicks: this.state.irrigationOnTicks,
         };
 
         this.state.results = results;
@@ -242,9 +246,22 @@ export class GardenSimulation {
             return;
         }
         
+        const prevIrrigationOn = this.state.irrigationOn;
+
         // Let the controller decide on irrigation state
         const metrics = computeGardenMetrics(this.state, this.garden);
         this.state.irrigationOn = this.controller.decide(metrics, this.state);
+
+        // Track irrigation toggles and time spent on
+        if (this.state.irrigationOn !== prevIrrigationOn) {
+            this.state.irrigationToggleCount += 1;
+            if (this.state.irrigationOn) {
+                this.state.lastIrrigationTick = this.state.tick;
+            }
+        }
+        if (this.state.irrigationOn) {
+            this.state.irrigationOnTicks += 1;
+        }
         
         // Weather evolution
         const nextWeather = evolveWeather(

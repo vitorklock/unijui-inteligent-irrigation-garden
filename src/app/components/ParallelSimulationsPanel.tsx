@@ -80,6 +80,8 @@ export const ParallelSimulationsPanel: React.FC = () => {
   const minScore = results ? Math.min(...results.map((r) => r.finalScore)) : "—";
   const maxScore = results ? Math.max(...results.map((r) => r.finalScore)) : "—";
   const totalWaterUsed = results ? results.reduce((sum, r) => sum + r.totalWaterUsed, 0).toFixed(2) : "—";
+  const avgToggleCount = results ? (results.reduce((sum, r) => sum + r.irrigationToggleCount, 0) / results.length).toFixed(2) : "—";
+  const avgOnTicks = results ? (results.reduce((sum, r) => sum + r.irrigationOnTicks, 0) / results.length).toFixed(2) : "—";
 
   return (
     <div className="flex flex-col gap-6 w-full">
@@ -215,7 +217,7 @@ export const ParallelSimulationsPanel: React.FC = () => {
             <CardDescription>{results.length} simulations completed</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div className="flex flex-col">
                 <span className="text-sm text-gray-600">Average Score</span>
                 <span className="text-2xl font-bold">{avgScore}</span>
@@ -233,6 +235,14 @@ export const ParallelSimulationsPanel: React.FC = () => {
                 <span className="text-2xl font-bold">
                   {results.length > 0 ? (parseFloat(totalWaterUsed as string) / results.length).toFixed(2) : "—"}
                 </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm text-gray-600">Avg Toggles</span>
+                <span className="text-2xl font-bold">{avgToggleCount}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm text-gray-600">Avg On Ticks</span>
+                <span className="text-2xl font-bold">{avgOnTicks}</span>
               </div>
             </div>
           </CardContent>
@@ -253,6 +263,8 @@ export const ParallelSimulationsPanel: React.FC = () => {
                     <th className="px-4 py-2 text-left font-semibold">Sim</th>
                     <th className="px-4 py-2 text-right font-semibold">Score</th>
                     <th className="px-4 py-2 text-right font-semibold">Water Used</th>
+                    <th className="px-4 py-2 text-right font-semibold">Toggles</th>
+                    <th className="px-4 py-2 text-right font-semibold">On Ticks</th>
                     <th className="px-4 py-2 text-right font-semibold">Healthy</th>
                     <th className="px-4 py-2 text-right font-semibold">Dry</th>
                     <th className="px-4 py-2 text-right font-semibold">Flooded</th>
@@ -271,6 +283,8 @@ export const ParallelSimulationsPanel: React.FC = () => {
                         {result.finalScore}
                       </td>
                       <td className="px-4 py-2 text-right">{result.totalWaterUsed.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right">{result.irrigationToggleCount}</td>
+                      <td className="px-4 py-2 text-right">{result.irrigationOnTicks}</td>
                       <td className="px-4 py-2 text-right text-green-600">{result.healthyPlantTicks}</td>
                       <td className="px-4 py-2 text-right text-red-600">{result.dryPlantTicks}</td>
                       <td className="px-4 py-2 text-right text-blue-600">{result.floodedPlantTicks}</td>
