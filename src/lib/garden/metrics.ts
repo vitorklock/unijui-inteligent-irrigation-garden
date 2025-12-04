@@ -6,17 +6,15 @@ import { IDEAL_MAX_MOISTURE, IDEAL_MIN_MOISTURE, TICKS_PER_DAY } from "./consts"
 export function computeGardenMetrics(state: Simulation.State, garden: Garden): Simulation.Metrics {
     const { irrigationOn, lastIrrigationTick, tick, episodeLength, cumulativeWaterUsed, waterUsedThisTick } = state;
 
-    const { tiles } = garden;
+    const plantTiles = garden.tiles.flat().filter((t) => t.hasPlant);
 
-    // Flatten the 2D tiles array to iterate easily over all plants
-    const allTiles = tiles.flat();
     let sum = 0;
     let min = Infinity;
     let max = -Infinity;
     let dryCount = 0;
     let wetCount = 0;
-    const totalPlants = allTiles.length;
-    for (const tile of allTiles) {
+
+    for (const tile of plantTiles) {
         const m = tile.moisture;
         sum += m;
         if (m < min) min = m;
@@ -24,8 +22,9 @@ export function computeGardenMetrics(state: Simulation.State, garden: Garden): S
         if (m < IDEAL_MIN_MOISTURE) dryCount++;
         if (m > IDEAL_MAX_MOISTURE) wetCount++;
     }
+
+    const totalPlants = plantTiles.length;
     const avg = totalPlants > 0 ? sum / totalPlants : 0;
-    // Calculate percentage of plants in dry/wet categories
     const percentDry = totalPlants > 0 ? Math.round((dryCount / totalPlants) * 100) : 0;
     const percentWet = totalPlants > 0 ? Math.round((wetCount / totalPlants) * 100) : 0;
     // Calculate ticks since last irrigation (0 if currently irrigating)
