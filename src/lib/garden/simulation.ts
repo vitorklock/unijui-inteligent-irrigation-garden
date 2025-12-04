@@ -1,4 +1,6 @@
 // lib/garden/simulation.ts
+import { mulberry32 } from "../utils";
+import { TICKS_PER_DAY } from "./consts";
 import { Garden, Garden as GardenNS, Simulation, Weather } from "./types";
 
 interface StepParams {
@@ -160,13 +162,16 @@ export function stepGardenMoisture(params: StepParams): Garden {
     };
 }
 
-export function evolveWeather(prev: Weather.State, tick: number): Weather.State {
+export function evolveWeather(seed: number, prev: Weather.State, tick: number): Weather.State {
+
+    const rand = mulberry32(seed + tick);
+
     // very simple day/night cycle for sun + a bit of random rain
-    const dayPhase = (tick % 240) / 240; // 0..1
+    const dayPhase = (tick % TICKS_PER_DAY) / TICKS_PER_DAY; // 0..1
     const sunIntensity = Math.max(0, Math.sin(dayPhase * Math.PI * 2)); // 0..1
 
     // small random drizzle
-    const randomRain = Math.random() < 0.01 ? 0.5 : Math.max(0, prev.rainIntensity - 0.05);
+    const randomRain = rand() < 0.01 ? 0.5 : Math.max(0, prev.rainIntensity - 0.05);
 
     return {
         temperature: 20 + 10 * sunIntensity, // 20–30°C

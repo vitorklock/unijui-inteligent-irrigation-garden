@@ -1,3 +1,4 @@
+import { mulberry32 } from "../utils";
 import { Garden } from "./types";
 
 export interface GenerateGardenParams {
@@ -15,16 +16,6 @@ const DEFAULT_OPTIONS: Required<GenerateGardenParams> = {
     plantChanceNearPath: 0.25,
     seed: 42,
 };
-
-// simple PRNG for optional reproducibility
-function mulberry32(seed: number): () => number {
-    return function () {
-        let t = (seed += 0x6d2b79f5);
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-}
 
 export function generateGarden(
     options?: Partial<GenerateGardenParams>
