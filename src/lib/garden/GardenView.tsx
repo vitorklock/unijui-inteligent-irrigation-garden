@@ -3,9 +3,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { generateGarden } from "@/lib/garden/generator";
 import { planHoses } from "@/lib/garden/hosePlanner";
-import { Garden } from "./types";
+import { Garden, Simulation } from "./types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { evolveWeather, stepGardenMoisture } from "./simulation";
 
 interface GardenViewProps {
   width?: number;
@@ -54,6 +55,26 @@ export const GardenView: React.FC<GardenViewProps> = ({
     y: number;
   } | null>(null);
 
+  // Simulation state (tick, running, weather, and sim config)
+  const [simulation, setSimulation] = useState<Simulation.State>({
+    tick: 0,
+    isRunning: false,
+    irrigationOn: true,
+    weather: {
+      temperature: 25,
+      humidity: 0.5,
+      sunIntensity: 0.8,
+      rainIntensity: 0,
+    },
+    config: {
+      irrigationRate: 0.05,
+      baseEvaporationRate: 0.01,
+      diffusionRate: 0.15,
+      rainToMoisture: 0.03,
+      maxMoisture: 2.0,
+    },
+  });
+
   const regenerate = () => {
     const base = generateGarden({
       width: config.width,
@@ -66,6 +87,8 @@ export const GardenView: React.FC<GardenViewProps> = ({
       coverageRadius: config.coverageRadius,
     });
     setGarden(withHoses);
+    // Reset simulation progress when regenerating the garden
+    setSimulation((s) => ({ ...s, tick: 0, isRunning: false }));
   };
 
   const randomizeSeed = () => {
@@ -104,6 +127,40 @@ export const GardenView: React.FC<GardenViewProps> = ({
     regenerate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!garden) return;
+    if (!simulation.isRunning) return;
+
+    const interval = setInterval(() => {
+      setSimulation((prev) => {
+        // simple animated weather, for now
+        const nextWeather = evolveWeather(prev.weather, prev.tick);
+
+        setGarden((currentGarden) => {
+          if (!currentGarden) return currentGarden;
+
+          const nextGarden = stepGardenMoisture({
+            garden: currentGarden,
+            config: prev.config,
+            weather: nextWeather,
+            irrigationOn: prev.irrigationOn,
+          });
+
+          return nextGarden;
+        });
+
+        return {
+          ...prev,
+          tick: prev.tick + 1,
+          weather: nextWeather,
+        };
+      });
+    }, 100); // 100ms per tick
+
+    return () => clearInterval(interval);
+  }, [garden, simulation.isRunning]);
+
 
   if (!garden) return <div>Generating garden…</div>;
 
@@ -250,17 +307,19 @@ export const GardenView: React.FC<GardenViewProps> = ({
         </div>
       </div>
 
-      {/* Grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${garden.width}, 18px)`,
-          gridTemplateRows: `repeat(${garden.height}, 18px)`,
-          gap: 1,
-          background: "#222",
-          padding: 4,
-          borderRadius: 4,
-        }}
+      {/* Grid + Right Panel */}
+      <div className="flex gap-4">
+        {/* Grid */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${garden.width}, 18px)`,
+            gridTemplateRows: `repeat(${garden.height}, 18px)`,
+            gap: 1,
+            background: "#222",
+            padding: 4,
+            borderRadius: 4,
+          }}
       >
         {garden.tiles.flat().map((tile) => {
           const key = `${tile.x}-${tile.y}`;
@@ -269,8 +328,8 @@ export const GardenView: React.FC<GardenViewProps> = ({
           const isInWateringRange =
             hoveredHoseCenter !== null &&
             Math.abs(hoveredHoseCenter.x - tile.x) +
-              Math.abs(hoveredHoseCenter.y - tile.y) <=
-              config.coverageRadius;
+            Math.abs(hoveredHoseCenter.y - tile.y) <=
+            config.coverageRadius;
 
           return (
             <div
@@ -328,13 +387,45 @@ export const GardenView: React.FC<GardenViewProps> = ({
                     border: "1px solid #0ea5e9",
                     pointerEvents: "none",
                     backgroundColor: "rgba(14, 165, 233, 0.1)"
-                    
+
                   }}
                 />
               )}
             </div>
           );
         })}
+        </div>
+
+        {/* Right Panel: Controls and Stats */}
+        <div className="flex flex-col gap-4">
+          <button
+            onClick={() =>
+              setSimulation((prev) => ({ ...prev, isRunning: !prev.isRunning }))
+            }
+            className="px-3 py-2 border rounded"
+          >
+            {simulation.isRunning ? "Pause" : "Play"}
+          </button>
+
+          <button
+            onClick={() =>
+              setSimulation((prev) => ({
+                ...prev,
+                irrigationOn: !prev.irrigationOn,
+              }))
+            }
+            className="px-3 py-2 border rounded"
+          >
+            Irrigation: {simulation.irrigationOn ? "On" : "Off"}
+          </button>
+
+          <div className="flex flex-col gap-2 text-xs text-gray-500 border rounded p-2">
+            <div>Tick: {simulation.tick}</div>
+            <div>Temp: {simulation.weather.temperature.toFixed(1)}°C</div>
+            <div>Sun: {simulation.weather.sunIntensity.toFixed(2)}</div>
+            <div>Rain: {simulation.weather.rainIntensity.toFixed(2)}</div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -34,4 +34,43 @@ export interface Garden {
     height: number
     tiles: Garden.Tile[][] // tiles[y][x]
     hoses: Garden.HosePath[]
-}    
+}
+
+export namespace Weather {
+
+    export interface State {
+        /** °C, e.g. 0–40 */
+        temperature: number;
+        /** 0–1, relative humidity */
+        humidity: number;
+        /** 0–1, 0 = night, 1 = full sun */
+        sunIntensity: number;
+        /** 0–1, 0 = no rain, 1 = heavy rain */
+        rainIntensity: number;
+    }
+}
+
+export namespace Simulation {
+
+    /** Static parameters for the moisture simulation */
+    export interface Config {
+        /** Moisture added per tick at hose tiles when irrigation is ON */
+        irrigationRate: number;
+        /** Base evaporation rate per tick at neutral weather */
+        baseEvaporationRate: number;
+        /** How strongly moisture diffuses between neighbors (0–0.5) */
+        diffusionRate: number;
+        /** Multiplier for rain → soil moisture */
+        rainToMoisture: number;
+        /** Maximum moisture before we clamp (visual flooding can still be 1.2+ etc.) */
+        maxMoisture: number;
+    }
+
+    export interface State {
+        tick: number;
+        isRunning: boolean;
+        irrigationOn: boolean;
+        weather: Weather.State;
+        config: Simulation.Config;
+    }
+}
