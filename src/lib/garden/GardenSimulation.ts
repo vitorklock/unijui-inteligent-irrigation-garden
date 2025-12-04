@@ -2,7 +2,7 @@ import { Garden, Simulation, Weather, IrrigationController } from "./types";
 import { generateGarden } from "./generator";
 import { planHoses } from "./hosePlanner";
 import { stepGardenMoisture, evolveWeather } from "./simulation";
-import { EPISODE_LENGTH, FORECAST_TICK_WINDOW, IDEAL_MIN_MOISTURE, IDEAL_MAX_MOISTURE, WATER_USAGE_PER_TICK } from "./consts";
+import { EPISODE_LENGTH, FORECAST_TICK_WINDOW, IDEAL_MIN_MOISTURE, IDEAL_MAX_MOISTURE, WATER_USAGE_PER_TICK, SCORE_WEIGHT_HEALTH_RATIO, SCORE_WEIGHT_DRY_PENALTY, SCORE_WEIGHT_FLOOD_PENALTY, SCORE_WEIGHT_WATER_EFFICIENCY } from "./consts";
 import { computeGardenMetrics } from "./metrics";
 
 function createDefaultState(options: GardenSimulationOptions): Simulation.State {
@@ -195,10 +195,10 @@ export class GardenSimulation {
             // - Mild penalty for flooding
             // - Reward efficient water usage
             const rawScore =
-                0.6 * healthRatio +        // main objective: keep plants in ideal range
-                0.2 * (1 - dryRatio) +     // avoid dryness
-                0.1 * (1 - floodRatio) +   // avoid flooding
-                0.1 * waterScore;          // be water-efficient
+                SCORE_WEIGHT_HEALTH_RATIO * healthRatio -        // main objective: keep plants in ideal range
+                SCORE_WEIGHT_DRY_PENALTY * dryRatio -     // penalty for dryness
+                SCORE_WEIGHT_FLOOD_PENALTY * floodRatio +   // penalty for flooding
+                SCORE_WEIGHT_WATER_EFFICIENCY * waterScore;          // be water-efficient
 
             // Clamp to [0, 100] and round for a nice UI value
             finalScore = Math.max(0, Math.min(100, Math.round(rawScore * 100)));
