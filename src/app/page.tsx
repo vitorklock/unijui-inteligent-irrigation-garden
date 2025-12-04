@@ -3,6 +3,7 @@
 import { GardenView } from "@/lib/garden";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ParallelSimulationsPanel } from "@/app/components/ParallelSimulationsPanel";
+import { GATrainingUI } from "@/app/components/GATrainingUI";
 
 export default function Home() {
   return (
@@ -18,9 +19,10 @@ export default function Home() {
         </div>
 
         <Tabs defaultValue="garden" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-md grid-cols-3">
             <TabsTrigger value="garden">🌱 Garden View</TabsTrigger>
-            <TabsTrigger value="parallel">⚡ Parallel Simulations</TabsTrigger>
+            <TabsTrigger value="parallel">⚡ Simulations</TabsTrigger>
+            <TabsTrigger value="training">🧬 GA Training</TabsTrigger>
           </TabsList>
 
           <TabsContent value="garden" className="mt-6">
@@ -29,6 +31,10 @@ export default function Home() {
 
           <TabsContent value="parallel" className="mt-6">
             <ParallelSimulationsPanel />
+          </TabsContent>
+
+          <TabsContent value="training" className="mt-6">
+            <GATrainingUI />
           </TabsContent>
         </Tabs>
       </div>
