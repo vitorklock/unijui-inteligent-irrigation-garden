@@ -116,8 +116,8 @@ export class HumidityPredictorNN implements IrrigationController {
     const rainNorm = clamp(weather.rainIntensity, 0, 1); // 0–1
 
     const timeOfDay = clamp(metrics.timeOfDay, 0, 1);
-    const dry = clamp(metrics.percentTooDry, 0, 1);
-    const wet = clamp(metrics.percentTooWet, 0, 1);
+    const dry = clamp(metrics.percentTooDry / 100, 0, 1); // Convert 0-100 to 0-1
+    const wet = clamp(metrics.percentTooWet / 100, 0, 1); // Convert 0-100 to 0-1
     const avgMoisture = clamp(metrics.avgMoisture / 1.5, 0, 1); // normalize ~[0, 1.5] to [0, 1]
 
     // Build feature vector (9 features)
@@ -135,7 +135,10 @@ export class HumidityPredictorNN implements IrrigationController {
   }
 
   /**
-   * Forward pass: predict future percentTooDry.
+   * Forward pass: predict future percentTooDry using physics-based heuristic.
+   * 
+   * This replaces the previous random NN weights with a deterministic model
+   * that doesn't require training and actually makes sense.
    *
    * @param metrics - Current metrics
    * @param weather - Current weather
@@ -149,25 +152,35 @@ export class HumidityPredictorNN implements IrrigationController {
     state: Simulation.State,
     irrigationFlag: 0 | 1
   ): number {
-    const x = this.buildInputFeatures(metrics, weather, state, irrigationFlag);
-
-    if (x.length !== this.cfg.inputSize) {
-      throw new Error(
-        `NN input size mismatch: got ${x.length}, expected ${this.cfg.inputSize}`
-      );
+    // Simple physics-based prediction
+    const currentDry = metrics.percentTooDry / 100; // Convert to 0-1
+    
+    // Evaporation factor: higher temp and sun = more drying
+    const tempNorm = clamp(weather.temperature / 40, 0, 1);
+    const evaporationFactor = tempNorm * weather.sunIntensity * (1 - weather.humidity);
+    
+    // Rain reduces dryness
+    const rainFactor = weather.rainIntensity;
+    
+    // Predict future dryness
+    let futureDry = currentDry;
+    
+    if (irrigationFlag === 1) {
+      // Irrigation significantly reduces dryness
+      futureDry *= 0.4;
+    } else {
+      // Without irrigation, evaporation increases dryness
+      futureDry += evaporationFactor * 0.15;
     }
-
-    // First layer: hidden = ReLU(W1 @ x + b1)
-    const hidden = this.dense(this.cfg.W1, this.cfg.b1, x, this.relu);
-
-    // Second layer: output = sigmoid(W2 @ hidden + b2)
-    let z = this.cfg.b2;
-    for (let i = 0; i < hidden.length; i++) {
-      z += this.cfg.W2[i] * hidden[i];
-    }
-
-    const out = this.sigmoid(z);
-    return clamp(out, 0, 1);
+    
+    // Rain reduces dryness regardless of irrigation
+    futureDry -= rainFactor * 0.25;
+    
+    // Also consider current wetness - if plants are wet, less likely to be dry soon
+    const currentWet = metrics.percentTooWet / 100;
+    futureDry -= currentWet * 0.1;
+    
+    return clamp(futureDry, 0, 1);
   }
 
   /**
@@ -200,20 +213,18 @@ export class HumidityPredictorNN implements IrrigationController {
 /**
  * Default configuration for HumidityPredictorNN.
  *
- * This is a small randomly-initialized network for demonstration.
- * In a real system, you'd train this offline (in Python or via a training script)
- * on simulation data, then export the weights to use here.
- *
- * The weights are frozen at runtime (not updated online).
+ * NOTE: The NN now uses a physics-based heuristic in the forward() method,
+ * so these weights are not actually used. They're kept for API compatibility.
+ * 
+ * Previously used random weights which caused completely unpredictable behavior.
+ * The new approach is deterministic and doesn't require training.
  */
 export const DEFAULT_HUMIDITY_PREDICTOR_CONFIG: HumidityPredictorConfig = {
   inputSize: 9,
   hiddenSize: 16,
-  // Random-like weights for demo (would be trained in practice)
-  W1: Array.from({ length: 16 }, () =>
-    Array.from({ length: 9 }, () => (Math.random() - 0.5) * 0.5)
-  ),
-  b1: Array.from({ length: 16 }, () => (Math.random() - 0.5) * 0.1),
-  W2: Array.from({ length: 16 }, () => (Math.random() - 0.5) * 0.5),
+  // Dummy weights (not used by the physics-based forward method)
+  W1: Array.from({ length: 16 }, () => Array.from({ length: 9 }, () => 0)),
+  b1: Array.from({ length: 16 }, () => 0),
+  W2: Array.from({ length: 16 }, () => 0),
   b2: 0.0,
 };

@@ -20,11 +20,11 @@ export class DumbIrrigationController implements IrrigationController {
    * @param state Simulation.State
    */
   decide(metrics: Simulation.Metrics, state: Simulation.State): boolean {
-    // Turn off immediately if any flooding is detected
-    if (metrics.percentTooWet > 0.05) return false;
+    // Turn off immediately if flooding is detected (> 5% of plants)
+    if (metrics.percentTooWet > 5) return false;
     
-    // Only irrigate if significant dryness AND average moisture is low
-    if (metrics.percentTooDry > 0.15 && metrics.avgMoisture < this.moistureHigh) return true;
+    // Only irrigate if significant dryness (> 15% of plants) AND average moisture is low
+    if (metrics.percentTooDry > 15 && metrics.avgMoisture < this.moistureHigh) return true;
     
     // Otherwise stay off to prevent flooding
     return false;

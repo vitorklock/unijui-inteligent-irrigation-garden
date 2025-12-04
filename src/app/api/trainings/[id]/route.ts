@@ -3,7 +3,7 @@ import { getTrainingStore } from '@/lib/redis/trainingStore';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const store = getTrainingStore();
@@ -16,7 +16,8 @@ export async function GET(
       );
     }
 
-    const training = await store.load(params.id);
+    const { id } = await params;
+    const training = await store.load(id);
     
     if (!training) {
       return NextResponse.json(
@@ -37,7 +38,7 @@ export async function GET(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const store = getTrainingStore();
@@ -50,7 +51,8 @@ export async function DELETE(
       );
     }
 
-    await store.delete(params.id);
+    const { id } = await params;
+    await store.delete(id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

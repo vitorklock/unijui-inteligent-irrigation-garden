@@ -87,9 +87,9 @@ export class FuzzyClimateEvaluator {
     const rainNowHigh = tri(rainNow, 0.3, 0.7, 1.0);
     const rainSoonHigh = tri(forecastRainSoon, 0.3, 0.7, 1.0);
 
-    // Soil moisture sets
-    const percentTooDry = clamp01(metrics.percentTooDry);
-    const percentTooWet = clamp01(metrics.percentTooWet);
+    // Soil moisture sets (convert from 0-100 to 0-1 range)
+    const percentTooDry = clamp01(metrics.percentTooDry / 100);
+    const percentTooWet = clamp01(metrics.percentTooWet / 100);
 
     // --- Fuzzy rules for drynessRisk ---
 
