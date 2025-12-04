@@ -7,7 +7,7 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   GeneticAlgorithmTrainer,
   GATrainerConfig,
@@ -15,6 +15,19 @@ import {
 } from '@/lib/garden/controllers/SmartIrrigationController';
 import { DEFAULT_HUMIDITY_PREDICTOR_CONFIG } from '@/lib/garden/controllers/SmartIrrigationController';
 import { ControllerParams } from '@/lib/garden/controllers/SmartIrrigationController';
+
+interface SavedTraining {
+  id: string;
+  name: string;
+  params: ControllerParams;
+  fitness: number;
+  timestamp: string;
+  config: {
+    populationSize: number;
+    generations: number;
+    episodesPerIndividual: number;
+  };
+}
 
 export function GATrainingUI() {
   const [training, setTraining] = useState(false);
@@ -24,6 +37,12 @@ export function GATrainingUI() {
   const [avgFitness, setAvgFitness] = useState<number | null>(null);
   const [fitnessHistory, setFitnessHistory] = useState<number[]>([]);
   const [result, setResult] = useState<Chromosome | null>(null);
+  
+  // Redis state
+  const [redisConnected, setRedisConnected] = useState(false);
+  const [savedTrainings, setSavedTrainings] = useState<SavedTraining[]>([]);
+  const [saveName, setSaveName] = useState('');
+  const [saving, setSaving] = useState(false);
 
   // Training configuration
   const [config, setConfig] = useState<GATrainerConfig>({
@@ -33,6 +52,27 @@ export function GATrainingUI() {
     mutationStdDev: 0.2,
     mutationRate: 0.6,
   });
+
+  // Connect to Redis on mount
+  useEffect(() => {
+    const checkRedis = async () => {
+      try {
+        const response = await fetch('/api/trainings');
+        const connected = response.ok;
+        setRedisConnected(connected);
+        
+        if (connected) {
+          const data = await response.json();
+          setSavedTrainings(data.trainings || []);
+        }
+      } catch (err) {
+        console.error('Redis connection error:', err);
+        setRedisConnected(false);
+      }
+    };
+
+    checkRedis();
+  }, []);
 
   const handleStart = async () => {
     setTraining(true);
@@ -72,11 +112,106 @@ export function GATrainingUI() {
       setResult(allResults.bestChromosome);
       setFitnessHistory(allResults.fitnessHistory);
       setBestFitness(allResults.bestChromosome.fitness);
+      setSaveName(`Training-${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
     } catch (err) {
       console.error('Training error:', err);
       alert(`Training failed: ${err}`);
     } finally {
       setTraining(false);
+    }
+  };
+
+  const handleSaveToRedis = async () => {
+    if (!result || !redisConnected) return;
+    
+    setSaving(true);
+    try {
+      const training: SavedTraining = {
+        id: `training_${Date.now()}`,
+        name: saveName || `Training-${Date.now()}`,
+        params: result.params,
+        fitness: result.fitness,
+        timestamp: new Date().toISOString(),
+        config: {
+          populationSize: config.populationSize,
+          generations: config.generations,
+          episodesPerIndividual: 2,
+        }
+      };
+
+      const response = await fetch('/api/trainings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(training)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save training');
+      }
+
+      const data = await response.json();
+      alert(`✅ Saved to Redis with ID: ${data.id}`);
+      
+      // Refresh list
+      const listResponse = await fetch('/api/trainings');
+      if (listResponse.ok) {
+        const listData = await listResponse.json();
+        setSavedTrainings(listData.trainings || []);
+      }
+    } catch (err) {
+      console.error('Save error:', err);
+      alert(`Failed to save: ${err}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleLoadFromRedis = async (id: string) => {
+    try {
+      const response = await fetch(`/api/trainings/${id}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to load training');
+      }
+
+      const data = await response.json();
+      const training = data.training;
+      
+      if (training) {
+        setResult({
+          params: training.params,
+          fitness: training.fitness,
+        });
+        setBestFitness(training.fitness);
+        alert(`✅ Loaded: ${training.name}`);
+      }
+    } catch (err) {
+      console.error('Load error:', err);
+      alert(`Failed to load: ${err}`);
+    }
+  };
+
+  const handleDeleteFromRedis = async (id: string) => {
+    if (!confirm('Delete this training?')) return;
+    
+    try {
+      const response = await fetch(`/api/trainings/${id}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete training');
+      }
+      
+      // Refresh list
+      const listResponse = await fetch('/api/trainings');
+      if (listResponse.ok) {
+        const data = await listResponse.json();
+        setSavedTrainings(data.trainings || []);
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert(`Failed to delete: ${err}`);
     }
   };
 
@@ -312,6 +447,31 @@ export function GATrainingUI() {
             </button>
           </div>
 
+          {/* Save to Redis */}
+          {redisConnected && (
+            <div className="border-t pt-4 space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Save to Redis
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  placeholder="Training name..."
+                  className="flex-1 px-3 py-2 border rounded text-sm"
+                />
+                <button
+                  onClick={handleSaveToRedis}
+                  disabled={saving}
+                  className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors text-sm font-semibold disabled:bg-gray-400"
+                >
+                  {saving ? '💾 Saving...' : '💾 Save'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Usage */}
           <div className="bg-gray-900 text-gray-100 p-3 rounded text-xs font-mono overflow-x-auto">
             <pre>{`const controller = new SmartIrrigationController(
@@ -319,6 +479,67 @@ export function GATrainingUI() {
   nn,
   ${JSON.stringify(result.params, null, 2).split('\n').join('\n  ')}
 );`}</pre>
+          </div>
+        </div>
+      )}
+
+      {/* Saved Trainings from Redis */}
+      {redisConnected && savedTrainings.length > 0 && (
+        <div className="border rounded-lg p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">💾 Saved Trainings ({savedTrainings.length})</h3>
+            <span className="text-xs text-green-600">● Redis Connected</span>
+          </div>
+
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {savedTrainings.map((training) => (
+              <div
+                key={training.id}
+                className="flex items-center justify-between p-3 bg-gray-50 rounded border hover:border-blue-300 transition-colors"
+              >
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{training.name}</div>
+                  <div className="text-xs text-gray-600">
+                    Fitness: {training.fitness.toFixed(2)} • {new Date(training.timestamp).toLocaleString()}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Pop: {training.config.populationSize} • Gens: {training.config.generations}
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => handleLoadFromRedis(training.id)}
+                    className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+                  >
+                    Load
+                  </button>
+                  <button
+                    onClick={() => handleDeleteFromRedis(training.id)}
+                    className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Redis Not Connected Warning */}
+      {!redisConnected && (
+        <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
+          <div className="flex items-start gap-2">
+            <span className="text-yellow-600">⚠️</span>
+            <div>
+              <div className="font-medium text-yellow-900">Redis Not Connected</div>
+              <div className="text-sm text-yellow-800">
+                Make sure Redis is running on localhost:6379 to enable save/load functionality.
+              </div>
+              <code className="block mt-2 text-xs bg-yellow-100 p-2 rounded">
+                redis-server
+              </code>
+            </div>
           </div>
         </div>
       )}
