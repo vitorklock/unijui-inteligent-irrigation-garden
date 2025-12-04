@@ -64,6 +64,8 @@ export namespace Simulation {
         rainToMoisture: number
         /** Maximum moisture before we clamp (visual flooding can still be 1.2+ etc.) */
         maxMoisture: number
+        /** Coverage radius for hose watering (Manhattan distance) */
+        coverageRadius: number
     }
 
     export interface State {

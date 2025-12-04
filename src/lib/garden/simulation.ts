@@ -17,28 +17,9 @@ interface StepParams {
 export function stepGardenMoisture(params: StepParams): Garden {
     const { garden, config, weather, irrigationOn } = params;
     const { width, height } = garden;
-
-    // Quick references
     const tiles = garden.tiles;
 
-    // Precompute hose tiles as a boolean grid
-    const hoseMask: boolean[][] = Array.from({ length: height }, (_, y) =>
-        Array.from({ length: width }, (_, x) => false)
-    );
-
-    for (const hose of garden.hoses) {
-        for (const p of hose.tiles) {
-            if (
-                p.y >= 0 &&
-                p.y < height &&
-                p.x >= 0 &&
-                p.x < width &&
-                tiles[p.y][p.x].type !== "pillar"
-            ) {
-                hoseMask[p.y][p.x] = true;
-            }
-        }
-    }
+    const coverageRadius = config.coverageRadius;
 
     // Clone tiles shallowly, but we will replace each tile with a copy when updating
     const newTiles: GardenNS.Tile[][] = tiles.map((row) => row.slice() as GardenNS.Tile[]);
@@ -51,13 +32,25 @@ export function stepGardenMoisture(params: StepParams): Garden {
     // ---- 1. Irrigation + rain (source terms) ----
     const { irrigationRate, rainToMoisture, baseEvaporationRate, maxMoisture } = config;
 
-    // Irrigation adds water on hose tiles
+    // Irrigation: water all soil tiles within coverageRadius of each hose tile
     if (irrigationOn) {
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                const tile = tiles[y][x];
-                if (hoseMask[y][x] && tile.type === "soil") {
-                    moisture[y][x] += irrigationRate;
+        for (const hose of garden.hoses) {
+            for (const p of hose.tiles) {
+                for (let dy = -coverageRadius; dy <= coverageRadius; dy++) {
+                    for (let dx = -coverageRadius; dx <= coverageRadius; dx++) {
+                        const nx = p.x + dx;
+                        const ny = p.y + dy;
+                        if (
+                            nx >= 0 && nx < width &&
+                            ny >= 0 && ny < height &&
+                            Math.abs(dx) + Math.abs(dy) <= coverageRadius
+                        ) {
+                            const tile = tiles[ny][nx];
+                            if (tile.type === "soil") {
+                                moisture[ny][nx] += irrigationRate;
+                            }
+                        }
+                    }
                 }
             }
         }

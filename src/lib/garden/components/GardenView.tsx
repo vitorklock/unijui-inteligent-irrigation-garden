@@ -71,11 +71,12 @@ export const GardenView: React.FC<GardenViewProps> = ({
       rainIntensity: 0,
     },
     config: {
-      irrigationRate: 0.1,
+      irrigationRate: 0.05,
       baseEvaporationRate: 0.01,
-      diffusionRate: 0.2,
-      rainToMoisture: 0.03,
+      diffusionRate: 0.15,
+      rainToMoisture: 0.1,
       maxMoisture: 2.0,
+      coverageRadius: config.coverageRadius,
     },
     episodeLength: EPISODE_LENGTH,
     forecast: Array.from({ length: 10 }, () => 0),
@@ -120,6 +121,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
         ...config,
         seed: newSeed,
       });
+      setSimulation((s) => ({ ...s, tick: 0, isRunning: false }));
       return next;
     });
   };
@@ -156,7 +158,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
 
           const nextGarden = stepGardenMoisture({
             garden: currentGarden,
-            config: prev.config,
+            config: { ...prev.config, coverageRadius: config.coverageRadius },
             weather: nextWeather,
             irrigationOn: prev.irrigationOn,
           });
