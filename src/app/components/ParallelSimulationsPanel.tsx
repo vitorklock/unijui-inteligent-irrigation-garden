@@ -1,13 +1,19 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { runParallelGardenSimulations } from "@/app/actions/garden";
 import type { Simulation } from "@/lib/garden/types";
-import { CONTROLLERS } from "@/lib/garden/controllers/map";
+import { CONTROLLERS, ControllerKey } from "@/lib/garden/controllers/map";
+
+interface SavedTraining {
+  id: string;
+  name: string;
+  timestamp: string;
+}
 
 interface ParallelSimulationConfig {
   width: number;
@@ -17,7 +23,7 @@ interface ParallelSimulationConfig {
   coverageRadius: number;
   simulationCount: number;
   baseSeed: number;
-  controllerKey: keyof typeof CONTROLLERS;
+  controllerKey: ControllerKey;
 }
 
 export const ParallelSimulationsPanel: React.FC = () => {
@@ -35,6 +41,23 @@ export const ParallelSimulationsPanel: React.FC = () => {
   const [results, setResults] = useState<Simulation.Results[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [trainings, setTrainings] = useState<SavedTraining[]>([]);
+  const [selectedTrainingId, setSelectedTrainingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchTrainings = async () => {
+      try {
+        const response = await fetch('/api/trainings');
+        if (response.ok) {
+          const data = await response.json();
+          setTrainings(data.trainings || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch trainings:', err);
+      }
+    };
+    fetchTrainings();
+  }, []);
 
   const handleRunSimulations = async () => {
     setLoading(true);
@@ -51,6 +74,7 @@ export const ParallelSimulationsPanel: React.FC = () => {
         count: config.simulationCount,
         baseSeed: config.baseSeed,
         controllerKey: config.controllerKey,
+        trainingId: config.controllerKey === 'smart' ? selectedTrainingId : undefined,
       });
 
       setResults(simulationResults);
@@ -174,8 +198,27 @@ export const ParallelSimulationsPanel: React.FC = () => {
                   .map((k) => (
                     <option key={k} value={k}>{k}</option>
                   ))}
+                <option value="smart">smart</option>
               </select>
             </div>
+            {config.controllerKey === 'smart' && (
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Trained Parameters</label>
+                <select
+                  className="rounded-md border p-2 text-xs"
+                  value={selectedTrainingId || ''}
+                  onChange={(e) => setSelectedTrainingId(e.target.value || null)}
+                  disabled={loading}
+                >
+                  <option value="">Default Parameters</option>
+                  {trainings.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({new Date(t.timestamp).toLocaleDateString()})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="flex gap-2 mt-4">
             <Button onClick={handleRunSimulations} disabled={loading} className="flex-1">

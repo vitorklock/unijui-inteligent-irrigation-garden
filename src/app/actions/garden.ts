@@ -4,6 +4,8 @@ import chalk from "chalk";
 import { GardenSimulation, GardenSimulationOptions } from "@/lib/garden/GardenSimulation";
 import { Simulation } from "@/lib/garden/types";
 import { ControllerKey, CONTROLLERS } from "@/lib/garden/controllers/map";
+import { getTrainingStore } from "@/lib/redis/trainingStore";
+import { SmartIrrigationController, FuzzyClimateEvaluator, HumidityPredictorNN, DEFAULT_CONTROLLER_PARAMS, DEFAULT_HUMIDITY_PREDICTOR_CONFIG } from "@/lib/garden/controllers/SmartIrrigationController";
 
 /**
  * Options for running parallel simulations
@@ -15,6 +17,8 @@ export interface RunParallelSimulationsOptions extends Omit<GardenSimulationOpti
   baseSeed?: number;
   /** Optional controller key to use for all simulations (must be a key in `CONTROLLERS`) */
   controllerKey?: ControllerKey;
+  /** Optional training ID to load parameters for SmartIrrigationController */
+  trainingId?: string | null;
 }
 
 /**
@@ -25,9 +29,25 @@ export interface RunParallelSimulationsOptions extends Omit<GardenSimulationOpti
 export async function runParallelGardenSimulations(
   options: RunParallelSimulationsOptions
 ): Promise<Simulation.Results[]> {
-  const { count, baseSeed = Date.now(), ...sharedConfig } = options;
+  const { count, baseSeed = Date.now(), trainingId, ...sharedConfig } = options;
   const controllerKey = (options as RunParallelSimulationsOptions).controllerKey;
-  const ControllerClass = controllerKey ? CONTROLLERS[controllerKey] : undefined;
+  const ControllerClass = (controllerKey && controllerKey !== 'smart') ? CONTROLLERS[controllerKey] : undefined;
+
+  // Load trained parameters if using SmartIrrigationController with a training ID
+  let trainedParams = null;
+  if (controllerKey === 'smart' && trainingId) {
+    try {
+      const store = getTrainingStore();
+      await store.connect();
+      const training = await store.load(trainingId);
+      if (training) {
+        trainedParams = training.params;
+        console.log(chalk.magenta.bold(`\n🧠 Using trained parameters: ${training.name}`));
+      }
+    } catch (err) {
+      console.error('Failed to load training:', err);
+    }
+  }
 
   console.log(chalk.blue.bold(`\n🌱 Starting ${count} parallel garden simulations...`));
 
@@ -35,7 +55,16 @@ export async function runParallelGardenSimulations(
   const simulationPromises = Array.from({ length: count }, (_, index) => {
     const seed = baseSeed + index;
     // If a controller class/key was provided, instantiate it and pass it to the simulation
-    const controllerInstance = ControllerClass ? new ControllerClass() : undefined;
+    let controllerInstance;
+    if (controllerKey === 'smart') {
+      // Create SmartIrrigationController with trained or default params
+      const params = trainedParams || DEFAULT_CONTROLLER_PARAMS;
+      const fuzzy = new FuzzyClimateEvaluator();
+      const nn = new HumidityPredictorNN(DEFAULT_HUMIDITY_PREDICTOR_CONFIG);
+      controllerInstance = new SmartIrrigationController(fuzzy, nn, params);
+    } else if (ControllerClass) {
+      controllerInstance = new ControllerClass();
+    }
     return runSingleSimulation({ ...sharedConfig, seed, controller: controllerInstance }, index);
   });
 

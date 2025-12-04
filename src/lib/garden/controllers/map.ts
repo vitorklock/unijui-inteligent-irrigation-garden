@@ -12,4 +12,4 @@ export const CONTROLLERS = {
     alwaysOff: AlwaysOffIrrigationController,
 } as const;
 
-export type ControllerKey = keyof typeof CONTROLLERS;
+export type ControllerKey = keyof typeof CONTROLLERS | 'smart';
