@@ -9,8 +9,11 @@ import { MetricsPanel } from "./MetricsPanel";
 import { EpisodeResults } from "./EpisodeResults";
 import { RainForecastTable } from "./RainForecastTable";
 import { MoistureStatusMap } from "./MoistureStatusMap";
+import { ControllerSelector } from "./ControllerSelector";
 import { GardenSimulation, GardenSimulationOptions } from "../GardenSimulation";
 import { ManualIrrigationController } from "../controllers/ManualIrrigationController";
+import { CONTROLLERS, ControllerKey } from "../controllers/map";
+import { SmartIrrigationController, FuzzyClimateEvaluator, HumidityPredictorNN, DEFAULT_CONTROLLER_PARAMS, DEFAULT_HUMIDITY_PREDICTOR_CONFIG } from "../controllers/SmartIrrigationController";
 
 interface GardenViewProps {
   width?: number;
@@ -24,6 +27,7 @@ interface GardenConfig {
   plantChanceNearPath: number;
   seed: number;
   coverageRadius: number;
+  controllerKey: ControllerKey;
 }
 
 const tileColor = (tile: Garden.Tile): string => {
@@ -49,6 +53,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
     plantChanceNearPath: 0.25,
     seed: 42, // static default
     coverageRadius: 1,
+    controllerKey: 'manual',
   });
 
 
@@ -59,9 +64,40 @@ export const GardenView: React.FC<GardenViewProps> = ({
   const [simulation, setSimulation] = useState<Simulation.State | null>(null);
   const [hoveredHoseCenter, setHoveredHoseCenter] = useState<{ x: number; y: number } | null>(null);
   const [overrideEpisodeEnd, setOverrideEpisodeEnd] = useState(false);
+  const [selectedTrainingId, setSelectedTrainingId] = useState<string | null>(null);
 
+  const regenerate = async () => {
+    // Create the appropriate controller based on selection
+    let controller;
+    
+    if (config.controllerKey === 'smart') {
+      // Load trained parameters if a training is selected
+      let params = DEFAULT_CONTROLLER_PARAMS;
+      if (selectedTrainingId) {
+        try {
+          const response = await fetch(`/api/trainings/${selectedTrainingId}`);
+          if (response.ok) {
+            const training = await response.json();
+            if (training?.params) {
+              params = training.params;
+            }
+          }
+        } catch (err) {
+          console.error('Failed to load training:', err);
+        }
+      }
+      
+      const fuzzy = new FuzzyClimateEvaluator();
+      const nn = new HumidityPredictorNN(DEFAULT_HUMIDITY_PREDICTOR_CONFIG);
+      controller = new SmartIrrigationController(fuzzy, nn, params);
+    } else {
+      const ControllerClass = CONTROLLERS[config.controllerKey as keyof typeof CONTROLLERS];
+      controller = new ControllerClass();
+      if (config.controllerKey === 'manual') {
+        controllerRef.current = controller as ManualIrrigationController;
+      }
+    }
 
-  const regenerate = () => {
     const options: GardenSimulationOptions = {
       width: config.width,
       height: config.height,
@@ -69,7 +105,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
       plantChanceNearPath: config.plantChanceNearPath,
       seed: config.seed,
       coverageRadius: config.coverageRadius,
-      controller: controllerRef.current,
+      controller,
     };
     simRef.current = new GardenSimulation(options);
     setGarden(simRef.current.garden);
@@ -80,23 +116,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
 
   const randomizeSeed = () => {
     const newSeed = Math.floor(Math.random() * 10_000);
-    setConfig((prev) => {
-      const next = { ...prev, seed: newSeed };
-      const options: GardenSimulationOptions = {
-        width: next.width,
-        height: next.height,
-        pillarDensity: next.pillarDensity,
-        plantChanceNearPath: next.plantChanceNearPath,
-        seed: next.seed,
-        coverageRadius: next.coverageRadius,
-        controller: controllerRef.current,
-      };
-      simRef.current = new GardenSimulation(options);
-      setGarden(simRef.current.garden);
-      setSimulation({ ...simRef.current.state });
-      setOverrideEpisodeEnd(false);
-      return next;
-    });
+    setConfig((prev) => ({ ...prev, seed: newSeed }));
   };
 
   // Precompute hose tiles for fast lookups
@@ -111,12 +131,12 @@ export const GardenView: React.FC<GardenViewProps> = ({
     return set;
   }, [garden]);
 
-  // initial generation
+  // initial generation and regenerate when controller or training changes
 
   useEffect(() => {
     regenerate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [config.controllerKey, selectedTrainingId]);
 
 
   useEffect(() => {
@@ -274,6 +294,18 @@ export const GardenView: React.FC<GardenViewProps> = ({
               }}
             />
           </div>
+
+          {/* Controller selection */}
+          <div className="flex items-center gap-1">
+            <span>Controller</span>
+            <ControllerSelector
+              controllerKey={config.controllerKey}
+              selectedTrainingId={selectedTrainingId}
+              onControllerChange={(key) => setConfig((prev) => ({ ...prev, controllerKey: key }))}
+              onTrainingChange={setSelectedTrainingId}
+              trainingClassName="rounded-md border px-2 h-8 text-xs max-w-[180px]"
+            />
+          </div>
         </div>
       </div>
 
@@ -396,24 +428,37 @@ export const GardenView: React.FC<GardenViewProps> = ({
                 {simulation.isRunning ? "Pause" : "Play"}
               </button>
 
-              <button
-                onClick={() => {
-                  const newState = !controllerRef.current.isIrrigationEnabled();
-                  controllerRef.current.setIrrigation(newState);
-                  if (simRef.current) {
-                    setSimulation({ ...simRef.current.state });
-                  }
-                }}
-                className="px-3 py-2 border rounded"
-              >
-                Irrigation: {controllerRef.current.isIrrigationEnabled() ? "On" : "Off"}
-              </button>
+              {config.controllerKey === 'manual' && (
+                <button
+                  onClick={() => {
+                    const newState = !controllerRef.current.isIrrigationEnabled();
+                    controllerRef.current.setIrrigation(newState);
+                    if (simRef.current) {
+                      setSimulation({ ...simRef.current.state });
+                    }
+                  }}
+                  className="px-3 py-2 border rounded"
+                >
+                  Irrigation: {controllerRef.current.isIrrigationEnabled() ? "On" : "Off"}
+                </button>
+              )}
 
               <div className="flex flex-col gap-2 text-xs text-gray-500 border rounded p-2">
                 <div>Tick: {simulation.tick}</div>
                 <div>Temp: {simulation.weather.temperature.toFixed(1)}°C</div>
                 <div>Sun: {simulation.weather.sunIntensity.toFixed(2)}</div>
                 <div>Rain: {simulation.weather.rainIntensity.toFixed(2)}</div>
+                <div className="flex items-center gap-2 pt-2 mt-2 border-t">
+                  <span>Water:</span>
+                  <div className={`flex items-center gap-1 font-semibold ${
+                    simulation.irrigationOn ? 'text-blue-600' : 'text-gray-400'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      simulation.irrigationOn ? 'bg-blue-600 animate-pulse' : 'bg-gray-400'
+                    }`} />
+                    {simulation.irrigationOn ? 'ON' : 'OFF'}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

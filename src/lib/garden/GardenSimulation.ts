@@ -200,8 +200,13 @@ export class GardenSimulation {
                 SCORE_WEIGHT_FLOOD_PENALTY * floodRatio +   // penalty for flooding
                 SCORE_WEIGHT_WATER_EFFICIENCY * waterScore;          // be water-efficient
 
+            // Normalize: max possible rawScore is 0.6 + 0.1 = 0.7 (healthRatio=1, waterScore=1, penalties=0)
+            // We want to scale this to [0, 100], so divide by the theoretical max
+            const maxPossibleRaw = SCORE_WEIGHT_HEALTH_RATIO + SCORE_WEIGHT_WATER_EFFICIENCY;
+            const normalizedScore = (rawScore / maxPossibleRaw) * 100;
+            
             // Clamp to [0, 100] and round for a nice UI value
-            finalScore = Math.max(0, Math.min(100, Math.round(rawScore * 100)));
+            finalScore = Math.max(0, Math.min(100, Math.round(normalizedScore)));
         }
 
         const results: Simulation.Results = {

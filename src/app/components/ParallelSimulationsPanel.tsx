@@ -8,12 +8,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { runParallelGardenSimulations } from "@/app/actions/garden";
 import type { Simulation } from "@/lib/garden/types";
 import { CONTROLLERS, ControllerKey } from "@/lib/garden/controllers/map";
-
-interface SavedTraining {
-  id: string;
-  name: string;
-  timestamp: string;
-}
+import { ControllerSelector } from "@/lib/garden/components/ControllerSelector";
 
 interface ParallelSimulationConfig {
   width: number;
@@ -41,23 +36,7 @@ export const ParallelSimulationsPanel: React.FC = () => {
   const [results, setResults] = useState<Simulation.Results[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [trainings, setTrainings] = useState<SavedTraining[]>([]);
   const [selectedTrainingId, setSelectedTrainingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchTrainings = async () => {
-      try {
-        const response = await fetch('/api/trainings');
-        if (response.ok) {
-          const data = await response.json();
-          setTrainings(data.trainings || []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch trainings:', err);
-      }
-    };
-    fetchTrainings();
-  }, []);
 
   const handleRunSimulations = async () => {
     setLoading(true);
@@ -186,39 +165,18 @@ export const ParallelSimulationsPanel: React.FC = () => {
             </div>
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium">Controller</label>
-              <select
-                className="rounded-md border p-2 text-xs"
-                value={config.controllerKey as string}
-                onChange={(e) => updateConfig("controllerKey", e.target.value)}
+              <ControllerSelector
+                controllerKey={config.controllerKey}
+                selectedTrainingId={selectedTrainingId}
+                onControllerChange={(key) => updateConfig("controllerKey", key)}
+                onTrainingChange={setSelectedTrainingId}
                 disabled={loading}
-              >
-                {Object
-                  .keys(CONTROLLERS)
-                  .filter(k => k !== 'manual')
-                  .map((k) => (
-                    <option key={k} value={k}>{k}</option>
-                  ))}
-                <option value="smart">smart</option>
-              </select>
+                excludeManual={true}
+                showTrainingDate={true}
+                controllerClassName="rounded-md border p-2 text-xs"
+                trainingClassName="rounded-md border p-2 text-xs"
+              />
             </div>
-            {config.controllerKey === 'smart' && (
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium">Trained Parameters</label>
-                <select
-                  className="rounded-md border p-2 text-xs"
-                  value={selectedTrainingId || ''}
-                  onChange={(e) => setSelectedTrainingId(e.target.value || null)}
-                  disabled={loading}
-                >
-                  <option value="">Default Parameters</option>
-                  {trainings.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({new Date(t.timestamp).toLocaleDateString()})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
           </div>
           <div className="flex gap-2 mt-4">
             <Button onClick={handleRunSimulations} disabled={loading} className="flex-1">
