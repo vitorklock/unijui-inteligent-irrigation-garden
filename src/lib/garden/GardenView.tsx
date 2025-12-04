@@ -23,7 +23,7 @@ interface GardenConfig {
 
 const tileColor = (tile: Garden.Tile): string => {
   if (tile.type === "pillar") return "#555555";
-  if (tile.type === "path") return "#b3a07a";
+  if (tile.type === "path") return "#b09764";
   if (tile.type === "water_source") return "#2b6cb0"; // blue-ish
 
   const m = tile.moisture;
@@ -327,6 +327,8 @@ export const GardenView: React.FC<GardenViewProps> = ({
                     borderRadius: 9999,
                     border: "1px solid #0ea5e9",
                     pointerEvents: "none",
+                    backgroundColor: "rgba(14, 165, 233, 0.1)"
+                    
                   }}
                 />
               )}
