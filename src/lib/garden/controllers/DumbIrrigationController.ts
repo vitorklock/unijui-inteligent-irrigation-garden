@@ -2,14 +2,14 @@ import { IrrigationController, Simulation } from "../types";
 import { IDEAL_MIN_MOISTURE } from "../consts";
 
 /**
- * Dumb irrigation controller: irrigates if dry percentage is above threshold, otherwise off.
- * Now uses threshold logic for dry/wet ratios and avgMoisture.
+ * Dumb irrigation controller: now irrigates much more eagerly, only backing off when
+ * things look obviously saturated so that it occasionally overshoots and floods.
  */
 export class DumbIrrigationController implements IrrigationController {
   private moistureLow: number;
   private moistureHigh: number;
 
-  constructor(moistureLow: number = IDEAL_MIN_MOISTURE, moistureHigh: number = 1) {
+  constructor(moistureLow: number = IDEAL_MIN_MOISTURE, moistureHigh: number = 0.85) {
     this.moistureLow = moistureLow;
     this.moistureHigh = moistureHigh;
   }
@@ -20,13 +20,18 @@ export class DumbIrrigationController implements IrrigationController {
    * @param state Simulation.State
    */
   decide(metrics: Simulation.Metrics, state: Simulation.State): boolean {
-    // Turn off immediately if flooding is detected (> 5% of plants)
-    if (metrics.percentTooWet > 5) return false;
-    
-    // Only irrigate if significant dryness (> 15% of plants) AND average moisture is low
-    if (metrics.percentTooDry > 15 && metrics.avgMoisture < this.moistureHigh) return true;
-    
-    // Otherwise stay off to prevent flooding
+    // Only cut water when things are clearly saturated to allow for occasional overwatering
+    if (metrics.percentTooWet > 30 && metrics.avgMoisture > this.moistureHigh) return false;
+
+    // Irrigate eagerly whenever dryness is noticeable
+    if (metrics.percentTooDry > 12) return true;
+
+    // Keep watering if the average moisture is still close to or below the desired floor
+    if (metrics.avgMoisture < this.moistureLow + 0.05) return true;
+
+    // Even without obvious dryness, continue watering until the garden looks fairly wet
+    if (metrics.percentTooWet < 20 && metrics.avgMoisture < this.moistureHigh) return true;
+
     return false;
   }
 }

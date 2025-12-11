@@ -18,7 +18,7 @@ export const GARDEN_PATH_BRANCH_COUNT=6
 
 /** Score evaluation weights */
 export const SCORE_WEIGHT_HEALTH_RATIO = 0.6
-export const SCORE_WEIGHT_DRY_PENALTY = 0.2
-export const SCORE_WEIGHT_FLOOD_PENALTY = 0.1
+export const SCORE_WEIGHT_DRY_PENALTY = 0.1
+export const SCORE_WEIGHT_FLOOD_PENALTY = 0.2
 export const SCORE_WEIGHT_WATER_EFFICIENCY = 0.1
 
