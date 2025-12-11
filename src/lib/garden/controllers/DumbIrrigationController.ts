@@ -1,10 +1,6 @@
 import { IrrigationController, Simulation } from "../types";
 import { IDEAL_MIN_MOISTURE } from "../consts";
 
-/**
- * Dumb irrigation controller: now irrigates much more eagerly, only backing off when
- * things look obviously saturated so that it occasionally overshoots and floods.
- */
 export class DumbIrrigationController implements IrrigationController {
   private moistureLow: number;
   private moistureHigh: number;
@@ -20,6 +16,7 @@ export class DumbIrrigationController implements IrrigationController {
    * @param state Simulation.State
    */
   decide(metrics: Simulation.Metrics, state: Simulation.State): boolean {
+    
     // Only cut water when things are clearly saturated to allow for occasional overwatering
     if (metrics.percentTooWet > 30 && metrics.avgMoisture > this.moistureHigh) return false;
 
